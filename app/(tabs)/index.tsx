@@ -1,252 +1,477 @@
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View, Text, Pressable, Modal, Image } from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { useEvents, useUserProfile } from '@/hooks/useMockApi';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { ArrowRight, Award, Bell, Calendar, ChevronRight } from 'lucide-react-native';
+import React, { useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-import { useEvents } from '@/hooks/useApi';
-import { useAssistants } from '@/hooks/useAssistants';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { ThemedView } from '@/components/themed-view';
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+const { width } = Dimensions.get('window');
 
-type Highlight = ReturnType<typeof useEvents>['data'] extends (infer U)[] ? U : never;
+export default function DashboardScreen() {
+  const router = useRouter();
+  const { data: events, isLoading } = useEvents();
+  const { data: user } = useUserProfile();
+  const [selectedHighlight, setSelectedHighlight] = useState<number | null>(null);
 
-export default function HomeScreen() {
-  const { isSignedIn } = useAuth();
-  const { user } = useUserProfile();
-  const { data: events } = useEvents();
-  const { data: assistants } = useAssistants(true);
-  const [selected, setSelected] = useState<Highlight | null>(null);
+  const highlights = events?.filter(e => e.type === 'highlight') || [];
+  const upcomingDeadlines = events
+    ?.filter(e => e.type === 'deadline')
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+    .slice(0, 5) || [];
 
-  const highlights = useMemo(
-    () => (events || []).filter((evt) => evt.type === 'highlight'),
-    [events],
+  // Extract user name from email for display
+  const userName = user?.email?.split('@')[0] || 'User';
+  const userDisplayName = userName
+    .split('.')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+  const userSurname = userName.split('.')[userName.split('.').length - 1] || userName;
+
+  const renderHighlight = ({ item, index }: { item: any; index: number }) => (
+    <TouchableOpacity
+      style={styles.highlightCard}
+      onPress={() => setSelectedHighlight(index)}>
+      {item.photoUrl ? (
+        <Image source={{ uri: item.photoUrl }} style={styles.highlightImage} />
+      ) : (
+        <View style={[styles.highlightImage, styles.highlightPlaceholder]}>
+          <Award size={48} color="#3b82f6" />
+        </View>
+      )}
+      <View style={styles.highlightBadge}>
+        <Award size={12} color="#ffffff" />
+        <Text style={styles.highlightBadgeText}>HIGHLIGHT</Text>
+      </View>
+      <View style={styles.highlightContent}>
+        <Text style={styles.highlightDate}>
+          {new Date(item.start).toLocaleDateString('id-ID', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+        </Text>
+        <Text style={styles.highlightTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.highlightCourse}>{item.course}</Text>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <ThemedView style={styles.hero}>
-        <ThemedText type="title" style={styles.heroTitle}>
-          Laboratorium Ilmu Rekayasa dan Komputasi
-        </ThemedText>
-        <ThemedText style={styles.heroSubtitle}>
-          Portal riset, asisten, dan alat virtual — kini di mobile.
-        </ThemedText>
-        <View style={styles.heroBadges}>
-          <Badge text="Virtual Lab" />
-          <Badge text="Timeline" />
-          <Badge text="Assistant" />
-          {isSignedIn && <Badge text={`Role: ${user?.role ?? 'user'}`} />}
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Hero Section with Gradient */}
+      <LinearGradient
+        colors={['#1e40af', '#3b82f6', '#06b6d4']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}>
+        {/* Background Logo */}
+        <View style={styles.logoBackground}>
+          <Text style={styles.logoText}>iK</Text>
         </View>
-      </ThemedView>
 
-      <Section title="Highlights" description="Kegiatan terbaru dan konten unggulan.">
-        {highlights.length === 0 ? (
-          <ThemedText style={styles.muted}>Belum ada highlight.</ThemedText>
-        ) : (
-          highlights.map((item) => (
-            <Pressable key={item._id} style={styles.card} onPress={() => setSelected(item)}>
-              <View style={styles.cardHeader}>
-                <ThemedText type="subtitle">{item.title}</ThemedText>
-                <Text style={styles.badge}>{item.course}</Text>
-              </View>
-              <Text style={styles.muted}>{formatDate(item.start)}</Text>
-              <Text numberOfLines={2} style={styles.body}>
-                {item.description || 'Tidak ada deskripsi.'}
-              </Text>
-            </Pressable>
-          ))
-        )}
-      </Section>
+        {/* Header with Bell Icon */}
+        <View style={styles.heroHeader}>
+          <View style={styles.heroHeaderLeft}>
+            <Text style={styles.heroSubtitle}>Selamat Datang!</Text>
+            <Text style={styles.heroTitle}>{userSurname}</Text>
+          </View>
+          <TouchableOpacity style={styles.bellButton}>
+            <Bell size={24} color="#ffffff" />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
-      <Section title="Our Team" description="Asisten laboratorium aktif.">
-        {assistants && assistants.length > 0 ? (
-          <View style={styles.assistantGrid}>
-            {assistants.map((asst) => (
-              <View key={asst._id} style={styles.assistantCard}>
-                <Image
-                  source={{ uri: asst.image || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&q=80' }}
-                  style={styles.avatar}
-                />
-                <ThemedText type="defaultSemiBold">{asst.name}</ThemedText>
-                <Text style={styles.muted}>{asst.role}</Text>
-                <Text style={styles.meta}>{asst.angkatan}</Text>
-              </View>
+      {/* User Profile Card - Overlapping Hero */}
+      <View style={styles.profileCardContainer}>
+        <TouchableOpacity
+          style={styles.profileCard}
+          onPress={() => router.push('/(tabs)/profile')}>
+          <Image
+            source={{
+              uri: 'https://media.istockphoto.com/id/1477583639/vector/user-profile-icon-vector-avatar-or-person-icon-profile-picture-portrait-symbol-vector.jpg?s=612x612&w=0&k=20&c=OWGIPPkZIWLPvnQS14ZSyHMoGtVTn1zS8cAgLy1Uh24=',
+            }}
+            style={styles.profileImage}
+          />
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{userDisplayName}</Text>
+            <Text style={styles.profileRole}>
+              {user?.role === 'admin'
+                ? 'Administrator'
+                : user?.role === 'assistant'
+                  ? 'Assistant'
+                  : 'Student'}
+            </Text>
+          </View>
+          <ChevronRight size={24} color="#64748b" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Latest Highlights */}
+      {highlights.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Latest Highlights</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={highlights}
+            renderItem={renderHighlight}
+            keyExtractor={(item) => item._id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.highlightsList}
+          />
+        </View>
+      )}
+
+      {/* Upcoming Deadlines */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Upcoming Deadlines</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllText}>See All</Text>
+          </TouchableOpacity>
+        </View>
+        {isLoading ? (
+          <Text style={styles.loadingText}>Loading...</Text>
+        ) : upcomingDeadlines.length > 0 ? (
+          <View style={styles.deadlinesList}>
+            {upcomingDeadlines.map((deadline) => (
+              <TouchableOpacity key={deadline._id} style={styles.deadlineCard}>
+                <View style={styles.deadlineIcon}>
+                  <Calendar size={20} color="#ef4444" />
+                </View>
+                <View style={styles.deadlineContent}>
+                  <Text style={styles.deadlineTitle}>{deadline.title}</Text>
+                  <Text style={styles.deadlineCourse}>{deadline.course}</Text>
+                  <Text style={styles.deadlineDate}>
+                    {new Date(deadline.start).toLocaleDateString('id-ID', {
+                      weekday: 'long',
+                      month: 'long',
+                      day: 'numeric',
+                    })}
+                  </Text>
+                </View>
+                <ArrowRight size={20} color="#64748b" />
+              </TouchableOpacity>
             ))}
           </View>
         ) : (
-          <ThemedText style={styles.muted}>Belum ada data asisten.</ThemedText>
+          <Text style={styles.emptyText}>No upcoming deadlines</Text>
         )}
-      </Section>
-
-      <Modal visible={!!selected} animationType="slide" transparent onRequestClose={() => setSelected(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            {selected?.photoUrl ? (
-              <Image source={{ uri: selected.photoUrl }} style={styles.modalImage} />
-            ) : null}
-            <ThemedText type="title">{selected?.title}</ThemedText>
-            <Text style={styles.muted}>{selected ? formatDate(selected.start) : ''}</Text>
-            <Text style={styles.body}>{selected?.description || 'Tidak ada deskripsi.'}</Text>
-            {selected?.linkAttachments?.map((link) => (
-              <Text key={link.url} style={styles.link}>{link.title} — {link.url}</Text>
-            ))}
-            <Pressable style={styles.closeBtn} onPress={() => setSelected(null)}>
-              <Text style={styles.closeText}>Tutup</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      </View>
     </ScrollView>
   );
 }
 
-const Badge = ({ text }: { text: string }) => (
-  <View style={styles.badgePill}>
-    <Text style={styles.badgeText}>{text}</Text>
-  </View>
-);
-
-const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-
-const Section = ({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) => (
-  <View style={styles.section}>
-    <View style={styles.sectionHeader}>
-      <ThemedText type="subtitle">{title}</ThemedText>
-      {description && <Text style={styles.muted}>{description}</Text>}
-    </View>
-    {children}
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    gap: 16,
+    flex: 1,
+    backgroundColor: '#ffffff',
   },
   hero: {
-    backgroundColor: Colors.light.tint,
-    padding: 16,
-    borderRadius: 16,
+    padding: 24,
+    paddingTop: 60,
+    paddingBottom: 100,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  heroTitle: {
-    color: '#fff',
-    marginBottom: 6,
+  logoBackground: {
+    position: 'absolute',
+    right: -40,
+    top: 20,
+    opacity: 0.15,
+  },
+  logoText: {
+    fontSize: 120,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    fontStyle: 'italic',
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    zIndex: 1,
+  },
+  heroHeaderLeft: {
+    flex: 1,
   },
   heroSubtitle: {
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
+    color: '#ffffff',
+    opacity: 0.9,
+    marginBottom: 4,
   },
-  heroBadges: {
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    lineHeight: 36,
+  },
+  bellButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileCardContainer: {
+    marginTop: -60,
+    paddingHorizontal: 24,
+    zIndex: 10,
+  },
+  profileCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    gap: 12,
+  },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f1f5f9',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  profileRole: {
+    fontSize: 14,
+    color: '#64748b',
+  },
+  heroButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
     gap: 8,
-    marginTop: 12,
   },
-  section: {
-    backgroundColor: Colors.light.background,
-    padding: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  sectionHeader: {
-    gap: 4,
-  },
-  muted: {
-    color: '#666',
-  },
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#eee',
-    borderRadius: 12,
-    fontSize: 12,
-  },
-  badgePill: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  badgeText: {
-    color: '#fff',
+  primaryButtonText: {
+    color: '#3b82f6',
+    fontSize: 16,
     fontWeight: '600',
   },
-  card: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    gap: 6,
+  secondaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
   },
-  cardHeader: {
+  secondaryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  section: {
+    padding: 24,
+    paddingTop: 24,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  body: {
-    color: '#111',
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#0f172a',
+    marginBottom: 16,
   },
-  assistantGrid: {
+  seeAllText: {
+    fontSize: 14,
+    color: '#3b82f6',
+    fontWeight: '600',
+  },
+  coursesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
   },
-  assistantCard: {
-    width: '48%',
-    backgroundColor: '#fff',
-    padding: 12,
+  courseCard: {
+    width: (width - 60) / 3,
+    backgroundColor: '#f8fafc',
+    padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  courseCode: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  courseName: {
+    fontSize: 10,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  highlightsList: {
+    paddingRight: 24,
+  },
+  highlightCard: {
+    width: width * 0.85,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginRight: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    elevation: 2,
     shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  highlightImage: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#f1f5f9',
+  },
+  highlightPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  highlightBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  highlightBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  highlightContent: {
+    padding: 16,
+  },
+  highlightDate: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  highlightTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  highlightCourse: {
+    fontSize: 12,
+    color: '#64748b',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  deadlinesList: {
+    gap: 12,
+  },
+  deadlineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ef4444',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowRadius: 4,
     elevation: 2,
   },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 999,
-    marginBottom: 6,
-  },
-  meta: {
-    color: '#444',
-    fontSize: 12,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+  deadlineIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    gap: 10,
+  deadlineContent: {
+    flex: 1,
   },
-  modalImage: {
-    width: '100%',
-    height: 160,
-    borderRadius: 12,
-  },
-  link: {
-    color: Colors.light.tint,
-  },
-  closeBtn: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: Colors.light.tint,
-    borderRadius: 10,
-  },
-  closeText: {
-    color: '#fff',
+  deadlineTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  deadlineCourse: {
+    fontSize: 12,
+    color: '#64748b',
+    marginBottom: 2,
+  },
+  deadlineDate: {
+    fontSize: 12,
+    color: '#ef4444',
+    fontWeight: '500',
+  },
+  loadingText: {
+    textAlign: 'center',
+    color: '#64748b',
+    padding: 24,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#64748b',
+    padding: 24,
   },
 });

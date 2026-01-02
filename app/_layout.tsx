@@ -1,10 +1,11 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { ClerkProvider } from '@clerk/clerk-expo';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Toast from 'react-native-toast-message';
 import 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
+import '../global.css';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { tokenCache } from '@/utils/clerkTokenCache';
@@ -48,7 +49,7 @@ export default function RootLayout() {
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
-        <Toast position="top" />
+        <Toast />
       </QueryClientProvider>
     </ClerkProvider>
   );
