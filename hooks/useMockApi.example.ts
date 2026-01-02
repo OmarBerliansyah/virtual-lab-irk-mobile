@@ -1,5 +1,11 @@
+/**
+ * Example: How to update useMockApi.ts to use the API switcher
+ * 
+ * This file shows the changes needed. Replace mockApi with api throughout.
+ */
+
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api';
+import { api } from '@/lib/api'; // Changed from: import { mockApi } from '@/lib/mockApi';
 import type { CreateEventRequest, CreateTaskRequest, UpdateEventRequest, UpdateTaskRequest, User } from '@/types/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -7,14 +13,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 export const useEvents = (course?: string) => {
   return useQuery({
     queryKey: ['events', course],
-    queryFn: () => api.getEvents(course),
+    queryFn: () => api.getEvents(course), // Changed from: mockApi.getEvents(course)
   });
 };
 
 export const useCreateEvent = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (event: CreateEventRequest) => api.createEvent(event),
+    mutationFn: (event: CreateEventRequest) => api.createEvent(event), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
     },
@@ -25,7 +31,7 @@ export const useUpdateEvent = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, event }: { id: string; event: UpdateEventRequest }) =>
-      api.updateEvent(id, event),
+      api.updateEvent(id, event), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
     },
@@ -35,7 +41,7 @@ export const useUpdateEvent = () => {
 export const useDeleteEvent = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.deleteEvent(id),
+    mutationFn: (id: string) => api.deleteEvent(id), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
     },
@@ -46,15 +52,14 @@ export const useDeleteEvent = () => {
 export const useTasks = (assignee?: string, isAssistantTask?: boolean) => {
   return useQuery({
     queryKey: ['tasks', assignee, isAssistantTask],
-    queryFn: () => api.getTasks(assignee, isAssistantTask),
+    queryFn: () => api.getTasks(assignee, isAssistantTask), // Changed
   });
 };
 
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (task: CreateTaskRequest & { isAssistantTask?: boolean; assignedTo?: string[] }) => 
-      api.createTask(task),
+    mutationFn: (task: CreateTaskRequest) => api.createTask(task), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
@@ -65,7 +70,7 @@ export const useUpdateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, task }: { id: string; task: UpdateTaskRequest }) =>
-      api.updateTask(id, task),
+      api.updateTask(id, task), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
@@ -75,19 +80,7 @@ export const useUpdateTask = () => {
 export const useDeleteTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.deleteTask(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-};
-
-export const useMarkTaskCompleted = () => {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  return useMutation({
-    mutationFn: ({ taskId, studentEmail }: { taskId: string; studentEmail: string }) =>
-      api.markTaskCompleted(taskId, studentEmail),
+    mutationFn: (id: string) => api.deleteTask(id), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
@@ -96,23 +89,31 @@ export const useMarkTaskCompleted = () => {
 
 // User profile hooks
 export const useUserProfile = () => {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth(); // Get current user from auth context
+  
   return useQuery({
-    queryKey: ['profile', user?.clerkId],
-    queryFn: () => api.getProfile(user?.clerkId),
+    queryKey: ['profile', authUser?.clerkId],
+    queryFn: () => {
+      if (!authUser?.clerkId) {
+        throw new Error('Not authenticated');
+      }
+      return api.getProfile(authUser.clerkId); // Changed - now needs clerkId
+    },
     select: (data) => data.user,
-    enabled: !!user,
+    enabled: !!authUser?.clerkId, // Only run if authenticated
   });
 };
 
 export const useUpdateProfile = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+  
   return useMutation({
-    mutationFn: (data: Partial<{ email: string }>) => {
-      const clerkId = user?.clerkId;
-      // For mock API, clerkId is optional
-      return api.updateProfile(clerkId, data);
+    mutationFn: async (data: Partial<{ email: string }>) => {
+      if (!authUser?.clerkId) {
+        throw new Error('Not authenticated');
+      }
+      return api.updateProfile(authUser.clerkId, data); // Changed
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -122,11 +123,14 @@ export const useUpdateProfile = () => {
 
 export const useUpdateRole = () => {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+  
   return useMutation({
-    mutationFn: (role: 'user' | 'assistant' | 'admin') => {
-      const clerkId = user?.clerkId;
-      return api.updateRole(clerkId, role);
+    mutationFn: async (role: 'user' | 'assistant' | 'admin') => {
+      if (!authUser?.clerkId) {
+        throw new Error('Not authenticated');
+      }
+      return api.updateProfile(authUser.clerkId, { role }); // Changed
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -138,14 +142,15 @@ export const useUpdateRole = () => {
 export const useGetUsers = () => {
   return useQuery({
     queryKey: ['users'],
-    queryFn: () => api.getUsers(),
+    queryFn: () => api.getUsers(), // Changed
   });
 };
 
 export const useUpdateUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<User> }) => api.updateUser(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<User> }) => 
+      api.updateUser(id, data), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
@@ -156,7 +161,7 @@ export const useUpdateUser = () => {
 export const useDeleteUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api.deleteUser(id),
+    mutationFn: (id: string) => api.deleteUser(id), // Changed
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },

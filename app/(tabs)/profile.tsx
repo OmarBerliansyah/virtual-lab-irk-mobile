@@ -1,6 +1,7 @@
+import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useMockApi';
 import { useRouter } from 'expo-router';
-import { Settings, Shield, User } from 'lucide-react-native';
+import { LogOut, User } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +18,7 @@ import Toast from 'react-native-toast-message';
 export default function ProfileScreen() {
   const router = useRouter();
   const { data: user, isLoading, refetch } = useUserProfile();
+  const { logout } = useAuth();
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -49,9 +51,6 @@ export default function ProfileScreen() {
       setSaving(false);
     }
   };
-
-  const isAssistant = user?.role === 'assistant';
-  const isAdmin = user?.role === 'admin';
 
   return (
     <ScrollView
@@ -87,13 +86,13 @@ export default function ProfileScreen() {
               <View
                 style={[
                   styles.roleBadge,
-                  isAdmin && styles.roleBadgeAdmin,
-                  isAssistant && styles.roleBadgeAssistant,
+                  user?.role === 'admin' && styles.roleBadgeAdmin,
+                  user?.role === 'assistant' && styles.roleBadgeAssistant,
                 ]}>
                 <Text
                   style={[
                     styles.roleText,
-                    (isAdmin || isAssistant) && styles.roleTextActive,
+                    (user?.role === 'admin' || user?.role === 'assistant') && styles.roleTextActive,
                   ]}>
                   {user.role.toUpperCase()}
                 </Text>
@@ -136,35 +135,15 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Quick Access</Text>
-            {isAssistant || isAdmin ? (
-              <TouchableOpacity
-                style={styles.accessButton}
-                onPress={() => router.push('/assistant-dashboard')}>
-                <Shield size={20} color="#3b82f6" />
-                <Text style={styles.accessButtonText}>Assistant Dashboard</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.placeholderBox}>
-                <Text style={styles.placeholderText}>
-                  Assistant dashboard available for assistants/admins.
-                </Text>
-              </View>
-            )}
-            {isAdmin ? (
-              <TouchableOpacity
-                style={styles.accessButton}
-                onPress={() => router.push('/admin-dashboard')}>
-                <Settings size={20} color="#3b82f6" />
-                <Text style={styles.accessButtonText}>Admin Settings</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.placeholderBox}>
-                <Text style={styles.placeholderText}>
-                  Admin dashboard available for admins only.
-                </Text>
-              </View>
-            )}
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={async () => {
+                await logout();
+                router.replace('/login');
+              }}>
+              <LogOut size={20} color="#ef4444" />
+              <Text style={styles.logoutButtonText}>Log Out</Text>
+            </TouchableOpacity>
           </View>
         </>
       )}
@@ -288,31 +267,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
-  accessButton: {
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 12,
     padding: 16,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-    marginTop: 8,
+    borderWidth: 2,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
   },
-  accessButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  placeholderBox: {
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f8fafc',
-    marginTop: 8,
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ef4444',
   },
 });

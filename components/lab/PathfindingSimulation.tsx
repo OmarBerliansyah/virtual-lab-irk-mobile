@@ -1,14 +1,13 @@
-import { Circle, Edit, Flag, Info, MapPin, MousePointer, Move, Play, RotateCcw } from 'lucide-react-native';
+import { Circle, Flag, Info, MapPin, MousePointer, Move, Play, RotateCcw } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    PanResponder,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  PanResponder,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Svg, { Line, Circle as SvgCircle, Text as SvgText } from 'react-native-svg';
 import Toast from 'react-native-toast-message';
@@ -33,7 +32,7 @@ interface Edge {
   weight: number;
 }
 
-type Mode = 'addNode' | 'addEdge' | 'setStart' | 'setEnd' | 'select' | 'edit';
+type Mode = 'addNode' | 'addEdge' | 'setStart' | 'setEnd' | 'select';
 type Algorithm = 'bfs' | 'dfs' | 'tsp';
 
 interface AlgoStep {
@@ -83,6 +82,22 @@ const PathfindingSimulation = () => {
   const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragNodeId, setDragNodeId] = useState<number | null>(null);
+  const [startPosition, setStartPosition] = useState<{ x: number; y: number } | null>(null);
+  const DRAG_THRESHOLD = 10; // Minimum pixels to move before considering it a drag
+  
+  // Use refs to track current values for PanResponder callbacks
+  const modeRef = useRef<Mode>(mode);
+  const nodesRef = useRef<Node[]>(nodes);
+  const handleCanvasPressRef = useRef<((event: any) => void) | null>(null);
+  
+  // Update refs when state changes
+  React.useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  
+  React.useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   const buildAdjList = (): Map<number, { to: number; weight: number }[]> => {
     const adj = new Map<number, { to: number; weight: number }[]>();
@@ -105,8 +120,8 @@ const PathfindingSimulation = () => {
         case 'addNode':
           if (!clickedNode) {
             const newNodeId = nodes.length > 0 ? Math.max(...nodes.map((n) => n.id)) + 1 : 1;
-            setNodes([
-              ...nodes,
+            setNodes((prevNodes) => [
+              ...prevNodes,
               {
                 id: newNodeId,
                 x: locationX,
@@ -129,11 +144,14 @@ const PathfindingSimulation = () => {
               Toast.show({
                 type: 'info',
                 text1: 'Edge Mode',
-                text2: `Selected node ${clickedNode.id}. Select second node.`,
+                text2: `Selected node ${clickedNode.label || clickedNode.id}. Select second node.`,
               });
             } else if (addEdgeStart !== clickedNode.id) {
               const fromNode = nodes.find((n) => n.id === addEdgeStart);
-              if (!fromNode) return;
+              if (!fromNode) {
+                setAddEdgeStart(null);
+                return;
+              }
 
               const edgeExists = edges.some(
                 (edge) =>
@@ -149,17 +167,39 @@ const PathfindingSimulation = () => {
                   to: clickedNode.id,
                   weight,
                 };
-                setEdges([...edges, newEdge]);
+                setEdges((prevEdges) => [...prevEdges, newEdge]);
                 Toast.show({
                   type: 'success',
                   text1: 'Edge Created',
-                  text2: `Connected ${addEdgeStart} → ${clickedNode.id}`,
+                  text2: `Connected ${fromNode.label || addEdgeStart} → ${clickedNode.label || clickedNode.id}`,
+                });
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Edge Exists',
+                  text2: 'These nodes are already connected',
                 });
               }
               setAddEdgeStart(null);
+            } else {
+              // Clicked the same node, cancel edge creation
+              setAddEdgeStart(null);
+              Toast.show({
+                type: 'info',
+                text1: 'Cancelled',
+                text2: 'Edge creation cancelled',
+              });
             }
           } else {
-            setAddEdgeStart(null);
+            // Clicked empty space, cancel edge creation
+            if (addEdgeStart !== null) {
+              setAddEdgeStart(null);
+              Toast.show({
+                type: 'info',
+                text1: 'Cancelled',
+                text2: 'Edge creation cancelled',
+              });
+            }
           }
           break;
 
@@ -169,67 +209,79 @@ const PathfindingSimulation = () => {
             Toast.show({
               type: 'success',
               text1: 'Start Node Set',
-              text2: `Node ${clickedNode.id} is now the start`,
+              text2: `Node ${clickedNode.label || clickedNode.id} is now the start`,
+            });
+          } else {
+            Toast.show({
+              type: 'error',
+              text1: 'No Node Selected',
+              text2: 'Tap on a node to set it as the start',
             });
           }
           break;
 
         case 'setEnd':
           if (clickedNode) {
+            if (algorithm === 'tsp') {
+              Toast.show({
+                type: 'info',
+                text1: 'TSP Mode',
+                text2: 'TSP only requires a start node',
+              });
+              return;
+            }
             setEndNode(clickedNode.id);
             Toast.show({
               type: 'success',
               text1: 'End Node Set',
-              text2: `Node ${clickedNode.id} is now the end`,
+              text2: `Node ${clickedNode.label || clickedNode.id} is now the end`,
+            });
+          } else {
+            Toast.show({
+              type: 'error',
+              text1: 'No Node Selected',
+              text2: 'Tap on a node to set it as the end',
             });
           }
           break;
 
         case 'select':
           if (clickedNode) {
-            const newSelected = new Set(selectedNodes);
-            if (newSelected.has(clickedNode.id)) {
-              newSelected.delete(clickedNode.id);
-            } else {
-              newSelected.add(clickedNode.id);
-            }
-            setSelectedNodes(newSelected);
+            setSelectedNodes((prevSelected) => {
+              const newSelected = new Set(prevSelected);
+              if (newSelected.has(clickedNode.id)) {
+                newSelected.delete(clickedNode.id);
+                Toast.show({
+                  type: 'info',
+                  text1: 'Node Deselected',
+                  text2: `Node ${clickedNode.label || clickedNode.id} deselected`,
+                });
+              } else {
+                newSelected.add(clickedNode.id);
+                Toast.show({
+                  type: 'info',
+                  text1: 'Node Selected',
+                  text2: `Node ${clickedNode.label || clickedNode.id} selected`,
+                });
+              }
+              return newSelected;
+            });
             setSelectedEdges(new Set());
           } else {
+            // Clicked empty space, deselect all
             setSelectedNodes(new Set());
             setSelectedEdges(new Set());
           }
           break;
-
-        case 'edit':
-          if (clickedNode) {
-            Alert.prompt(
-              'Edit Node Label',
-              `Enter new label for node ${clickedNode.id}:`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'OK',
-                  onPress: (newLabel?: string) => {
-                    if (newLabel !== null && newLabel !== undefined && newLabel) {
-                      setNodes(
-                        nodes.map((n) =>
-                          n.id === clickedNode.id ? { ...n, label: newLabel } : n
-                        )
-                      );
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              clickedNode.label || clickedNode.id.toString()
-            );
-          }
-          break;
       }
     },
-    [mode, nodes, edges, addEdgeStart, selectedNodes, isVisualizing]
+    [mode, nodes, edges, addEdgeStart, selectedNodes, isVisualizing, algorithm]
   );
+  
+  // Update the ref whenever handleCanvasPress changes
+  React.useEffect(() => {
+    handleCanvasPressRef.current = handleCanvasPress;
+  }, [handleCanvasPress]);
 
   const handleLongPress = useCallback(
     (event: any) => {
@@ -256,14 +308,28 @@ const PathfindingSimulation = () => {
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only capture movement if we're in select mode and have moved enough
+        const currentMode = modeRef.current;
+        if (currentMode === 'select') {
+          const dx = Math.abs(gestureState.dx);
+          const dy = Math.abs(gestureState.dy);
+          return dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD;
+        }
+        return false;
+      },
       onPanResponderGrant: (event) => {
         const { locationX, locationY } = event.nativeEvent;
-        const clickedNode = getNearestNode(locationX, locationY, nodes);
+        setStartPosition({ x: locationX, y: locationY });
+        const currentNodes = nodesRef.current;
+        const currentMode = modeRef.current;
+        const clickedNode = getNearestNode(locationX, locationY, currentNodes);
 
-        if (clickedNode && mode === 'select') {
-          setIsDragging(true);
+        // Only prepare for dragging if in select mode and clicked on a node
+        if (clickedNode && currentMode === 'select') {
           setDragNodeId(clickedNode.id);
+        } else {
+          setDragNodeId(null);
         }
 
         const timer = setTimeout(() => {
@@ -271,25 +337,37 @@ const PathfindingSimulation = () => {
         }, 500) as unknown as NodeJS.Timeout;
         setLongPressTimer(timer);
       },
-      onPanResponderMove: (event) => {
+      onPanResponderMove: (event, gestureState) => {
         if (longPressTimer) {
           clearTimeout(longPressTimer);
           setLongPressTimer(null);
         }
 
-        if (isDragging && dragNodeId !== null) {
-          const { locationX, locationY } = event.nativeEvent;
-          setNodes(
-            nodes.map((n) =>
-              n.id === dragNodeId
-                ? {
-                    ...n,
-                    x: Math.max(NODE_RADIUS, Math.min(CANVAS_WIDTH - NODE_RADIUS, locationX)),
-                    y: Math.max(NODE_RADIUS, Math.min(CANVAS_HEIGHT - NODE_RADIUS, locationY)),
-                  }
-                : n
-            )
-          );
+        // Check if we've moved enough to consider it a drag
+        const currentMode = modeRef.current;
+        if (startPosition && dragNodeId !== null && currentMode === 'select') {
+          const dx = Math.abs(gestureState.dx);
+          const dy = Math.abs(gestureState.dy);
+          
+          if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+            if (!isDragging) {
+              setIsDragging(true);
+            }
+            
+            const { locationX, locationY } = event.nativeEvent;
+            const currentNodes = nodesRef.current;
+            setNodes(
+              currentNodes.map((n) =>
+                n.id === dragNodeId
+                  ? {
+                      ...n,
+                      x: Math.max(NODE_RADIUS, Math.min(CANVAS_WIDTH - NODE_RADIUS, locationX)),
+                      y: Math.max(NODE_RADIUS, Math.min(CANVAS_HEIGHT - NODE_RADIUS, locationY)),
+                    }
+                  : n
+              )
+            );
+          }
         }
       },
       onPanResponderRelease: (event) => {
@@ -298,12 +376,25 @@ const PathfindingSimulation = () => {
           setLongPressTimer(null);
         }
 
-        if (!isDragging) {
-          handleCanvasPress(event);
+        // Always handle as tap if we didn't drag (for all modes)
+        if (!isDragging && handleCanvasPressRef.current) {
+          handleCanvasPressRef.current(event);
         }
 
+        // Reset all drag-related state
         setIsDragging(false);
         setDragNodeId(null);
+        setStartPosition(null);
+      },
+      onPanResponderTerminate: () => {
+        // Clean up on termination
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          setLongPressTimer(null);
+        }
+        setIsDragging(false);
+        setDragNodeId(null);
+        setStartPosition(null);
       },
     })
   ).current;
@@ -311,24 +402,42 @@ const PathfindingSimulation = () => {
   const visualize = (steps: AlgoStep[], finalPath: number[], totalCost: number) => {
     setIsVisualizing(true);
     setVisResult(null);
+    setCurrentStep(null);
     let step = 0;
 
+    // Limit steps to prevent memory issues
+    const MAX_STEPS = 1000;
+    const limitedSteps = steps.slice(0, MAX_STEPS);
+    const hasMoreSteps = steps.length > MAX_STEPS;
+
     const interval = setInterval(() => {
-      if (step < steps.length) {
-        setCurrentStep(steps[step++]);
-      } else {
+      try {
+        if (step < limitedSteps.length) {
+          setCurrentStep(limitedSteps[step++]);
+        } else {
+          clearInterval(interval);
+          setIsVisualizing(false);
+          const finalStep = limitedSteps[limitedSteps.length - 1] || { visited: [], path: finalPath };
+          setCurrentStep({ ...finalStep, path: finalPath });
+          setVisResult({
+            path: finalPath.join(' → '),
+            cost: totalCost,
+          });
+          Toast.show({
+            type: 'success',
+            text1: 'Visualization Complete',
+            text2: hasMoreSteps 
+              ? `Path: ${finalPath.join(' → ')} (showing first ${MAX_STEPS} steps)`
+              : `Path: ${finalPath.join(' → ')}`,
+          });
+        }
+      } catch (error) {
         clearInterval(interval);
         setIsVisualizing(false);
-        const finalStep = steps[steps.length - 1] || { visited: [], path: finalPath };
-        setCurrentStep({ ...finalStep, path: finalPath });
-        setVisResult({
-          path: finalPath.join(' → '),
-          cost: totalCost,
-        });
         Toast.show({
-          type: 'success',
-          text1: 'Visualization Complete',
-          text2: `Path: ${finalPath.join(' → ')}`,
+          type: 'error',
+          text1: 'Visualization Error',
+          text2: 'An error occurred during visualization',
         });
       }
     }, 200);
@@ -394,9 +503,14 @@ const PathfindingSimulation = () => {
       const s: number[] = [startNode];
       const visited: number[] = [];
       const parent = new Map<number, number | null>();
+      parent.set(startNode, null); // Initialize start node parent
 
       let found = false;
-      while (s.length > 0) {
+      let iterations = 0;
+      const maxIterations = nodes.length * nodes.length; // Safety limit
+
+      while (s.length > 0 && iterations < maxIterations) {
+        iterations++;
         const current = s.pop()!;
 
         if (visited.includes(current)) continue;
@@ -410,17 +524,25 @@ const PathfindingSimulation = () => {
 
         [...(adj.get(current) || [])].reverse().forEach((neighbor) => {
           if (!visited.includes(neighbor.to)) {
-            parent.set(neighbor.to, current);
+            // Only set parent if not already set (first time we discover this node)
+            if (!parent.has(neighbor.to)) {
+              parent.set(neighbor.to, current);
+            }
             s.push(neighbor.to);
           }
         });
       }
 
-      if (found) {
-        let at = endNode;
-        while (at !== null) {
+      if (found && endNode !== null) {
+        let at: number | null = endNode;
+        while (at !== null && at !== undefined) {
           finalPath.unshift(at);
-          at = parent.get(at)!;
+          const next = parent.get(at);
+          at = next !== undefined ? next : null;
+          // Safety check to prevent infinite loops
+          if (finalPath.length > nodes.length) {
+            break;
+          }
         }
       }
     } else if (algorithm === 'tsp') {
@@ -533,7 +655,6 @@ const PathfindingSimulation = () => {
     { value: 'setStart', label: 'Start', icon: MapPin },
     { value: 'setEnd', label: 'End', icon: Flag },
     { value: 'select', label: 'Select', icon: MousePointer },
-    { value: 'edit', label: 'Edit', icon: Edit },
   ];
 
   return (
@@ -653,7 +774,7 @@ const PathfindingSimulation = () => {
                 fill="#ffffff"
                 textAnchor="middle"
                 fontWeight="bold">
-                {node.label || node.id}
+                {node.label || String(node.id)}
               </SvgText>
             </React.Fragment>
           ))}

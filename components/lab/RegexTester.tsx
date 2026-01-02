@@ -24,7 +24,6 @@ const RegexTester = () => {
   const [sourceText, setSourceText] = useState(
     'Hello World! This is a Sample Text for Testing Regular Expressions. It contains Various Words and Numbers like 123 and 456.'
   );
-  const [highlightedText, setHighlightedText] = useState('');
   const [searchResults, setSearchResults] = useState<MatchResult[]>([]);
   const [error, setError] = useState('');
   const [isValidPattern, setIsValidPattern] = useState(true);
@@ -32,20 +31,51 @@ const RegexTester = () => {
   useEffect(() => {
     try {
       if (!pattern) {
-        setHighlightedText(sourceText);
         setError('');
         setSearchResults([]);
         setIsValidPattern(true);
         return;
       }
 
-      const finalFlags = flags.includes('g') ? flags : flags + 'g';
-      const regex = new RegExp(pattern, finalFlags);
-      const matches: MatchResult[] = [];
+      // Limit text length to prevent memory issues
+      const MAX_TEXT_LENGTH = 100000;
+      const MAX_MATCHES = 10000;
+      const textToSearch = sourceText.length > MAX_TEXT_LENGTH 
+        ? sourceText.substring(0, MAX_TEXT_LENGTH) 
+        : sourceText;
 
-      let match;
+      const finalFlags = flags.includes('g') ? flags : flags + 'g';
+      const matches: MatchResult[] = [];
       const globalRegex = new RegExp(pattern, finalFlags);
-      while ((match = globalRegex.exec(sourceText)) !== null) {
+      
+      let match;
+      let iterations = 0;
+      let lastIndex = -1;
+      const maxIterations = Math.min(MAX_MATCHES, textToSearch.length * 10); // Safety limit
+
+      while ((match = globalRegex.exec(textToSearch)) !== null) {
+        iterations++;
+        
+        // Safety check: prevent infinite loops
+        if (iterations > maxIterations) {
+          setError(`Too many matches (limited to ${MAX_MATCHES}). Pattern may cause performance issues.`);
+          setIsValidPattern(true);
+          setSearchResults(matches);
+          return;
+        }
+
+        // Prevent infinite loop on zero-length matches
+        if (match.index === lastIndex && match[0].length === 0) {
+          globalRegex.lastIndex++;
+          if (globalRegex.lastIndex > textToSearch.length) {
+            break;
+          }
+          lastIndex = globalRegex.lastIndex;
+          continue;
+        }
+
+        lastIndex = match.index;
+
         matches.push({
           match: match[0],
           index: match.index,
@@ -53,8 +83,20 @@ const RegexTester = () => {
           namedGroups: match.groups,
         });
 
+        // Handle zero-length matches to prevent infinite loops
         if (match[0].length === 0) {
           globalRegex.lastIndex++;
+          if (globalRegex.lastIndex > textToSearch.length) {
+            break;
+          }
+        }
+
+        // Safety check: limit total matches
+        if (matches.length >= MAX_MATCHES) {
+          setError(`Match limit reached (${MAX_MATCHES} matches). Showing first ${MAX_MATCHES} results.`);
+          setIsValidPattern(true);
+          setSearchResults(matches);
+          return;
         }
       }
 
@@ -65,7 +107,6 @@ const RegexTester = () => {
       setError(err instanceof Error ? err.message : 'Invalid regex pattern');
       setIsValidPattern(false);
       setSearchResults([]);
-      setHighlightedText(sourceText);
     }
   }, [pattern, flags, sourceText]);
 
@@ -146,18 +187,56 @@ const RegexTester = () => {
         <Text style={styles.label}>Preview (Matches Highlighted)</Text>
         <View style={styles.previewBox}>
           <Text style={styles.previewText}>
-            {sourceText.split('').map((char, idx) => {
-              const isMatch = searchResults.some(
-                (m) => idx >= m.index && idx < m.index + m.match.length
-              );
-              return (
+            {(() => {
+              // Optimize rendering for large texts
+              const MAX_PREVIEW_LENGTH = 5000;
+              const textToRender = sourceText.length > MAX_PREVIEW_LENGTH 
+                ? sourceText.substring(0, MAX_PREVIEW_LENGTH) + '...' 
+                : sourceText;
+              
+              // Build highlighted text more efficiently
+              const parts: { text: string; highlight: boolean }[] = [];
+              let lastIndex = 0;
+              
+              // Sort matches by index for efficient processing
+              const sortedMatches = [...searchResults]
+                .filter(m => m.index < textToRender.length)
+                .sort((a, b) => a.index - b.index);
+              
+              for (const match of sortedMatches) {
+                // Add text before match
+                if (match.index > lastIndex) {
+                  parts.push({
+                    text: textToRender.substring(lastIndex, match.index),
+                    highlight: false,
+                  });
+                }
+                // Add highlighted match
+                if (match.index + match.match.length <= textToRender.length) {
+                  parts.push({
+                    text: textToRender.substring(match.index, match.index + match.match.length),
+                    highlight: true,
+                  });
+                }
+                lastIndex = Math.max(lastIndex, match.index + match.match.length);
+              }
+              
+              // Add remaining text
+              if (lastIndex < textToRender.length) {
+                parts.push({
+                  text: textToRender.substring(lastIndex),
+                  highlight: false,
+                });
+              }
+              
+              return parts.map((part, idx) => (
                 <Text
                   key={idx}
-                  style={isMatch ? [styles.previewText, styles.highlight] : styles.previewText}>
-                  {char}
+                  style={part.highlight ? [styles.previewText, styles.highlight] : styles.previewText}>
+                  {part.text}
                 </Text>
-              );
-            })}
+              ));
+            })()}
           </Text>
         </View>
       </View>
