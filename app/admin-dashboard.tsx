@@ -11,7 +11,7 @@ import type { User } from '@/types/api';
 const RoleBadge = ({ role }: { role: User['role'] }) => {
   const style = [styles.badge];
   if (role === 'admin') style.push(styles.badgeAdmin);
-  else if (role === 'assistant') style.push(styles.badgeAssistant);
+  else if (role === 'ASSISTANT') style.push(styles.badgeAssistant);
   return <Text style={style}>{role}</Text>;
 };
 

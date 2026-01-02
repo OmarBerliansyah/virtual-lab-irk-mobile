@@ -64,7 +64,7 @@ export function useUserProfile() {
     fetchProfile,
     updateProfile,
     isAdmin: user?.role === 'admin',
-    isAssistant: user?.role === 'assistant' || user?.role === 'admin',
+    isAssistant: user?.role === 'ASSISTANT' || user?.role === 'admin',
     isUser: !!user,
   };
 }
