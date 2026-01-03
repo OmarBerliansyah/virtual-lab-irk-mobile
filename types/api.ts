@@ -2,7 +2,7 @@ export interface User {
   _id: string;
   clerkId: string;
   email: string;
-  role: 'user' | 'assistant' | 'admin';
+  role: 'USER' | 'ASSISTANT' | 'ADMIN';
   createdAt: string;
   updatedAt: string;
 }
@@ -12,7 +12,7 @@ export interface ProfileUser {
   id: string;
   clerkId: string;
   email: string;
-  role: 'user' | 'assistant' | 'admin';
+  role: 'USER' | 'ASSISTANT' | 'ADMIN';
   createdAt: string;
   updatedAt: string;
 }

@@ -63,8 +63,8 @@ export function useUserProfile() {
     error,
     fetchProfile,
     updateProfile,
-    isAdmin: user?.role === 'admin',
-    isAssistant: user?.role === 'ASSISTANT' || user?.role === 'admin',
+    isAdmin: user?.role === 'ADMIN',
+    isAssistant: user?.role === 'ASSISTANT' || user?.role === 'ADMIN',
     isUser: !!user,
   };
 }

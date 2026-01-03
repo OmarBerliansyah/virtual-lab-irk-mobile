@@ -36,7 +36,7 @@ export default function HomeScreen() {
           <Badge text="Virtual Lab" />
           <Badge text="Timeline" />
           <Badge text="Assistant" />
-          {isSignedIn && <Badge text={`Role: ${user?.role ?? 'user'}`} />}
+          {isSignedIn && <Badge text={`Role: ${user?.role ?? 'USER'}`} />}
         </View>
       </ThemedView>
 

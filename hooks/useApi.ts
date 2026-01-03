@@ -133,7 +133,7 @@ export const useHealth = () =>
 export const useGetUsers = () => {
   const { getAuthHeaders } = useApiAuth();
   const api = createAuthenticatedApi(getAuthHeaders);
-  return useQuery({ queryKey: ['admin', 'users'], queryFn: () => api.getAllUsers() });
+  return useQuery({ queryKey: ['ADMIN', 'users'], queryFn: () => api.getAllUsers() });
 };
 
 export const useUpdateUser = () => {
@@ -145,7 +145,7 @@ export const useUpdateUser = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<User> }) => api.updateUser(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      queryClient.invalidateQueries({ queryKey: ['ADMIN'] });
       toast({ title: 'Success', description: 'User updated successfully' });
     },
     onError: (error: Error) => {
@@ -163,7 +163,7 @@ export const useDeleteUser = () => {
   return useMutation({
     mutationFn: (id: string) => api.deleteUser(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      queryClient.invalidateQueries({ queryKey: ['ADMIN'] });
       toast({ title: 'Success', description: 'User deleted successfully' });
     },
     onError: (error: Error) => {
