@@ -41,10 +41,14 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   status: 'To Do' | 'In Progress' | 'Done';
   dueDate?: string;
-  assignee?: string;
+  assignee?: string; // For student tasks, this is the student email. For assistant tasks, this is null/empty
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  // For student tasks: track which students completed this task
+  completedBy?: string[]; // Array of student emails who completed this task
+  assignedTo?: string[]; // Array of student emails this task is assigned to (for auto-assigned tasks)
+  isAssistantTask?: boolean; // true if this is an assistant's personal task
 }
 
 export interface CreateTaskRequest {

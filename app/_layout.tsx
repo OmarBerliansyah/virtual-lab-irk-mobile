@@ -1,13 +1,18 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { ClerkProvider } from '@clerk/clerk-expo';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Toast from 'react-native-toast-message';
-import 'react-native-reanimated';
-
+import CustomSplashScreen from '@/components/SplashScreen';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { tokenCache } from '@/utils/clerkTokenCache';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
+import '../global.css';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -27,29 +32,62 @@ const queryClient = new QueryClient({
   },
 });
 
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+function RootLayoutNav() {
+  const colorScheme = useColorScheme();
+  const { isAuthenticated, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const [isSplashReady, setSplashReady] = useState(false);
 
-if (!clerkPublishableKey) {
-  console.error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
+  useEffect(() => {
+    if (isSplashReady && !isLoading) {
+      // Hide the splash screen once authentication state is loaded and splash animation is done
+      SplashScreen.hideAsync();
+    }
+  }, [isSplashReady, isLoading]);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(tabs)';
+
+    if (!isAuthenticated && inAuthGroup) {
+      // Redirect to login if not authenticated
+      router.replace('/login');
+    } else if (isAuthenticated && segments[0] === 'login') {
+      // Redirect to tabs if authenticated and on login screen
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, isLoading, segments, router]);
+
+  if (!isSplashReady || isLoading) {
+    return <CustomSplashScreen onFinish={() => setSplashReady(true)} />;
+  }
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <Stack.Screen name="assistant-dashboard" options={{ title: 'Assistant Dashboard' }} />
+        <Stack.Screen name="admin-dashboard" options={{ title: 'Admin Dashboard' }} />
+        <Stack.Screen name="task-detail/[id]" options={{ title: 'Task Details', presentation: 'card' }} />
+        <Stack.Screen name="task-management-detail/[id]" options={{ title: 'Task Management', presentation: 'card' }} />
+        <Stack.Screen name="highlight-detail/[id]" options={{ title: 'Highlight Details', presentation: 'card' }} />
+      </Stack>
+      <StatusBar style="auto" />
+    </ThemeProvider>
+  );
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey || ''} tokenCache={tokenCache}>
+    <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            <Stack.Screen name="assistant-dashboard" options={{ title: 'Assistant Dashboard' }} />
-            <Stack.Screen name="admin-dashboard" options={{ title: 'Admin Dashboard' }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
-        <Toast position="top" />
+        <RootLayoutNav />
+        <Toast />
       </QueryClientProvider>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }
