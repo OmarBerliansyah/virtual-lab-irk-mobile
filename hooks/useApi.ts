@@ -66,10 +66,15 @@ export const useDeleteEvent = () => {
 };
 
 // Tasks
-export const useTasks = () => {
+// Note: The backend doesn't filter by assignee/isAssistantTask yet, 
+// these params are kept for API compatibility with useMockApi
+export const useTasks = (_assignee?: string, _isAssistantTask?: boolean) => {
   const { getAuthHeaders } = useApiAuth();
   const api = createAuthenticatedApi(getAuthHeaders);
-  return useQuery({ queryKey: ['tasks'], queryFn: () => api.getTasks() });
+  return useQuery({ 
+    queryKey: ['tasks', _assignee, _isAssistantTask], 
+    queryFn: () => api.getTasks() 
+  });
 };
 
 export const useCreateTask = () => {
@@ -165,6 +170,129 @@ export const useDeleteUser = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ADMIN'] });
       toast({ title: 'Success', description: 'User deleted successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, type: 'error' });
+    },
+  });
+};
+
+// ========== USER PROFILE ==========
+export const useUserProfile = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+
+  return useQuery({
+    queryKey: ['profile'],
+    queryFn: async () => {
+      const response = await api.getProfile();
+      return response.user;
+    },
+  });
+};
+
+export const useUpdateProfile = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: { email?: string }) => api.updateProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({ title: 'Success', description: 'Profile updated successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, type: 'error' });
+    },
+  });
+};
+
+// ========== ASSISTANTS ==========
+export const useAssistants = (active?: boolean) =>
+  useQuery({
+    queryKey: ['assistants', active],
+    queryFn: () => publicApi.getAssistants(active),
+  });
+
+export const useAssistantMe = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+
+  return useQuery({
+    queryKey: ['assistant', 'me'],
+    queryFn: () => api.getAssistantMe(),
+  });
+};
+
+export const useCreateAssistant = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: any) => api.createAssistant(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assistants'] });
+      toast({ title: 'Success', description: 'Assistant created successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, type: 'error' });
+    },
+  });
+};
+
+export const useUpdateAssistant = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateAssistant(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assistants'] });
+      queryClient.invalidateQueries({ queryKey: ['assistant'] });
+      toast({ title: 'Success', description: 'Assistant updated successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, type: 'error' });
+    },
+  });
+};
+
+export const useDeleteAssistant = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => api.deleteAssistant(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assistants'] });
+      toast({ title: 'Success', description: 'Assistant deleted successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, type: 'error' });
+    },
+  });
+};
+
+export const useUpdateUserRole = () => {
+  const { getAuthHeaders } = useApiAuth();
+  const api = createAuthenticatedApi(getAuthHeaders);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) => api.updateUserRole(id, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ADMIN'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({ title: 'Success', description: 'User role updated successfully' });
     },
     onError: (error: Error) => {
       toast({ title: 'Error', description: error.message, type: 'error' });

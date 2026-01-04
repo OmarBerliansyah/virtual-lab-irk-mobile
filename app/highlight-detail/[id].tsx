@@ -1,4 +1,4 @@
-import { useEvents } from '@/hooks/useMockApi';
+import { useEvents } from '@/hooks/useApi';
 import { Image as ExpoImage } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Award, Calendar, ExternalLink } from 'lucide-react-native';

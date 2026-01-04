@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useTasks, useUpdateTask } from '@/hooks/useMockApi';
+import { useTasks, useUpdateTask } from '@/hooks/useApi';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Calendar, CheckCircle, ClipboardList, Clock, User } from 'lucide-react-native';
 import React, { useState } from 'react';

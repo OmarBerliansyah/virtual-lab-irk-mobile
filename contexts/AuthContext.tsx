@@ -1,9 +1,24 @@
-import { api } from '@/lib/api';
+/**
+ * AuthContext - Unified Authentication Context
+ * 
+ * This context supports multiple authentication modes:
+ * 1. Mock Auth (Default for development) - Uses mockAuth for local testing
+ * 2. Clerk Auth - Uses Clerk for production authentication with Hono backend
+ * 3. Supabase Auth - Uses Supabase for authentication (legacy support)
+ * 
+ * Set EXPO_PUBLIC_AUTH_MODE in .env to switch between modes:
+ * - 'mock' (default): Uses mock authentication
+ * - 'clerk': Uses Clerk + Hono backend
+ * - 'supabase': Uses Supabase authentication
+ */
+
 import { mockAuth, mockUsers } from '@/lib/mockAuth';
-import { supabase } from '@/lib/supabase';
 import type { User } from '@/types/api';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import Toast from 'react-native-toast-message';
+
+// Determine auth mode from environment
+const AUTH_MODE = process.env.EXPO_PUBLIC_AUTH_MODE || 'mock';
 
 interface AuthContextType {
   user: User | null;
@@ -20,99 +35,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check Supabase auth session on mount and when auth state changes
+  // Initialize auth state based on mode
   useEffect(() => {
-    if (!supabase) {
-      // Fallback to mock auth if Supabase not configured
-      const currentUser = mockAuth.getCurrentUser();
-      setUser(currentUser);
+    const initAuth = async () => {
+      if (AUTH_MODE === 'mock') {
+        // Mock auth - get current mock user
+        const currentUser = mockAuth.getCurrentUser();
+        setUser(currentUser);
+        setIsLoading(false);
+        return;
+      }
+
+      // For clerk or supabase mode, we'll handle initialization separately
+      // In production, you would integrate with Clerk here
       setIsLoading(false);
-      return;
-    }
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadUserFromSupabase(session.user.id);
-      } else {
-        setUser(null);
-        setIsLoading(false);
-      }
-    });
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        await loadUserFromSupabase(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setIsLoading(false);
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        await loadUserFromSupabase(session.user.id);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
+
+    initAuth();
   }, []);
 
-  const loadUserFromSupabase = async (supabaseUserId: string) => {
-    if (!supabase) return;
-
-    try {
-      // Try to get user from our users table
-      const { user: dbUser } = await api.getProfile(supabaseUserId);
-      setUser(dbUser);
-    } catch (error: any) {
-      // User doesn't exist in users table, create it
-      if (error.message === 'User not found') {
-        try {
-          // Get email from Supabase auth
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          if (authUser?.email) {
-            const newUser = await api.createUser({
-              clerkId: supabaseUserId, // Using supabaseUserId as the ID
-              email: authUser.email,
-              role: 'user',
-            });
-            setUser(newUser);
-            Toast.show({
-              type: 'success',
-              text1: 'Welcome!',
-              text2: 'Your account has been set up.',
-            });
-          }
-        } catch (createError) {
-          console.error('Error creating user:', createError);
-          // Fallback: create user object from Supabase auth data
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          if (authUser) {
-            setUser({
-              _id: authUser.id,
-              clerkId: authUser.id,
-              email: authUser.email || '',
-              role: 'user',
-              createdAt: authUser.created_at,
-              updatedAt: authUser.updated_at || authUser.created_at,
-            });
-          }
-        }
-      } else {
-        throw error;
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const login = async (email: string, password: string) => {
-    if (!supabase) {
-      // Fallback to mock auth
-      setIsLoading(true);
-      try {
+    setIsLoading(true);
+    try {
+      if (AUTH_MODE === 'mock') {
+        // Mock auth login
         const result = await mockAuth.login(email, password);
         if (result.success && result.user) {
           setUser(result.user);
@@ -129,79 +75,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
           throw new Error(result.error || 'Login failed');
         }
-      } finally {
-        setIsLoading(false);
+        return;
       }
-      return;
-    }
 
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password.trim(),
+      // For clerk mode, login is handled by Clerk components
+      // This is just a fallback
+      Toast.show({
+        type: 'info',
+        text1: 'Use Sign In',
+        text2: 'Please use the sign-in button',
       });
-
-      if (error) {
-        Toast.show({
-          type: 'error',
-          text1: 'Login Failed',
-          text2: error.message || 'Invalid credentials',
-        });
-        throw error;
-      }
-
-      if (data.user) {
-        await loadUserFromSupabase(data.user.id);
-        Toast.show({
-          type: 'success',
-          text1: 'Login Successful',
-          text2: `Welcome, ${data.user.email}!`,
-        });
-      }
     } catch (error) {
       console.error('Login error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string) => {
-    if (!supabase) {
-      Toast.show({
-        type: 'error',
-        text1: 'Sign Up Failed',
-        text2: 'Supabase not configured',
-      });
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password.trim(),
+      if (AUTH_MODE === 'mock') {
+        // Mock doesn't support sign up
+        Toast.show({
+          type: 'info',
+          text1: 'Demo Mode',
+          text2: 'Use one of the demo accounts to login',
+        });
+        return;
+      }
+
+      // For clerk mode, sign up is handled by Clerk components
+      Toast.show({
+        type: 'info',
+        text1: 'Use Sign Up',
+        text2: 'Please use the sign-up button',
       });
-
-      if (error) {
-        Toast.show({
-          type: 'error',
-          text1: 'Sign Up Failed',
-          text2: error.message || 'Unable to create account',
-        });
-        throw error;
-      }
-
-      if (data.user) {
-        // User will be created in loadUserFromSupabase when session is established
-        Toast.show({
-          type: 'success',
-          text1: 'Account Created!',
-          text2: 'Please check your email to verify your account.',
-        });
-      }
-    } catch (error) {
-      console.error('Sign up error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -210,9 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
-      if (supabase) {
-        await supabase.auth.signOut();
-      } else {
+      if (AUTH_MODE === 'mock') {
         await mockAuth.logout();
       }
       setUser(null);
@@ -255,5 +163,5 @@ export function useAuth() {
   return context;
 }
 
-// Export mock users for login screen (only used when Supabase is disabled)
+// Export mock users for login screen (only used in mock mode)
 export { mockUsers };

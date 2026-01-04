@@ -1,4 +1,4 @@
-import { useGetUsers, useTasks } from '@/hooks/useMockApi';
+import { useGetUsers, useTasks } from '@/hooks/useApi';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CheckCircle, ClipboardList, Clock, User } from 'lucide-react-native';
 import React from 'react';

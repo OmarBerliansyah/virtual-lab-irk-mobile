@@ -12,7 +12,7 @@ import {
   useUpdateTask,
   useUpdateUser,
   useUserProfile,
-} from '@/hooks/useMockApi';
+} from '@/hooks/useApi';
 import type { Event, Task, User } from '@/types/api';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';

@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserProfile } from '@/hooks/useMockApi';
+import { useUserProfile } from '@/hooks/useApi';
 import { useRouter } from 'expo-router';
 import { LogOut, User } from 'lucide-react-native';
 import React, { useState } from 'react';

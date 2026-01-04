@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useDeleteUser, useGetUsers, useUpdateUser } from '@/hooks/useMockApi';
+import { useDeleteUser, useGetUsers, useUpdateUser } from '@/hooks/useApi';
 import type { User } from '@/types/api';
 import { Stack, useRouter } from 'expo-router';
 import { AlertCircle, Save, Shield, Trash2, User as UserIcon } from 'lucide-react-native';
