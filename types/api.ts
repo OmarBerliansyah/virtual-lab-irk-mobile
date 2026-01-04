@@ -26,10 +26,8 @@ export interface Event {
   type: 'deadline' | 'release' | 'assessment' | 'highlight';
   description?: string;
   photoUrl?: string;
-  linkAttachments?: Array<{
-    title: string;
-    url: string;
-  }>;
+  linkAttachments?: { title: string; url: string }[];
+  version: number; // Required for OCC
   createdAt: string;
   updatedAt: string;
 }
@@ -43,6 +41,7 @@ export interface Task {
   dueDate?: string;
   assignee?: string; // For student tasks, this is the student email. For assistant tasks, this is null/empty
   tags: string[];
+  version: number; // Required for OCC
   createdAt: string;
   updatedAt: string;
   // For student tasks: track which students completed this task
@@ -61,7 +60,7 @@ export interface CreateTaskRequest {
   tags?: string[];
 }
 
-export type UpdateTaskRequest = Partial<CreateTaskRequest>;
+export type UpdateTaskRequest = Partial<CreateTaskRequest> & { version?: number };
 
 export interface CreateEventRequest {
   title: string;
@@ -71,13 +70,10 @@ export interface CreateEventRequest {
   type: 'deadline' | 'release' | 'assessment' | 'highlight';
   description?: string;
   photoUrl?: string;
-  linkAttachments?: Array<{
-    title: string;
-    url: string;
-  }>;
+  linkAttachments?: { title: string; url: string }[];
 }
 
-export type UpdateEventRequest = Partial<CreateEventRequest>;
+export type UpdateEventRequest = Partial<CreateEventRequest> & { version?: number };
 
 export interface UpdateUserRequest {
   email?: string;

@@ -1,8 +1,8 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateTask, useDeleteTask, useGetUsers, useTasks, useUpdateTask } from '@/hooks/useApi';
-import type { Task } from '@/types/api';
+import type { Task, User as UserType } from '@/types/api';
 import { Stack, useRouter } from 'expo-router';
-import { AlertCircle, ChevronDown, Edit, Plus, Trash2, User, X } from 'lucide-react-native';
+import { AlertCircle, ChevronDown, Edit, Plus, Trash2, User as UserIcon, X } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,7 +25,7 @@ export default function AssistantDashboardScreen() {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
-  const isAssistant = user?.role === 'assistant' || user?.role === 'admin';
+  const isAssistant = user?.role === 'ASSISTANT' || user?.role === 'ADMIN';
 
   const [draft, setDraft] = useState<Partial<Task>>({
     title: '',
@@ -34,17 +34,18 @@ export default function AssistantDashboardScreen() {
     status: 'To Do',
     dueDate: '',
     assignee: '',
+    version: 0, // Initialize version for OCC
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
 
   // Get list of students (users with role 'user')
-  const students = users?.filter(u => u.role === 'user') || [];
+  const students = users?.filter((u: UserType) => u.role === 'USER') || [];
 
   const grouped = useMemo(() => {
     const map: Record<string, Task[]> = { 'To Do': [], 'In Progress': [], Done: [] };
-    (tasks || []).forEach(t => {
+    (tasks || []).forEach((t: Task) => {
       if (map[t.status]) {
         map[t.status].push(t);
       }
@@ -53,7 +54,7 @@ export default function AssistantDashboardScreen() {
   }, [tasks]);
 
   const resetDraft = () => {
-    setDraft({ title: '', description: '', priority: 'medium', status: 'To Do', dueDate: '', assignee: '' });
+    setDraft({ title: '', description: '', priority: 'medium', status: 'To Do', dueDate: '', assignee: '', version: 0 });
     setEditingId(null);
     setShowForm(false);
   };
@@ -69,7 +70,10 @@ export default function AssistantDashboardScreen() {
     }
     if (editingId) {
       updateTask.mutate(
-        { id: editingId, task: { ...draft } },
+        { id: editingId, task: { 
+          ...draft,
+          version: draft.version // Send version for OCC (Optimistic Concurrency Control)
+        } },
         {
           onSuccess: () => {
             Toast.show({
@@ -85,6 +89,10 @@ export default function AssistantDashboardScreen() {
               text1: 'Update Failed',
               text2: err.message,
             });
+            // If conflict (409), refetch to get latest data
+            if (err.message.toLowerCase().includes('conflict') || err.message.includes('409')) {
+              refetch();
+            }
           },
         },
       );
@@ -251,7 +259,7 @@ export default function AssistantDashboardScreen() {
                 onPress={() => setShowAssigneePicker(!showAssigneePicker)}>
                 <Text style={[styles.pickerButtonText, !draft.assignee && styles.pickerButtonPlaceholder]}>
                   {draft.assignee 
-                    ? students.find(s => s.email === draft.assignee)?.email || draft.assignee
+                    ? students.find((s: UserType) => s.email === draft.assignee)?.email || draft.assignee
                     : 'Select student...'}
                 </Text>
                 <ChevronDown size={20} color="#64748b" />
@@ -267,7 +275,7 @@ export default function AssistantDashboardScreen() {
                       }}>
                       <Text style={styles.pickerItemText}>None (Unassigned)</Text>
                     </TouchableOpacity>
-                    {students.map((student) => (
+                    {students.map((student: UserType) => (
                       <TouchableOpacity
                         key={student._id}
                         style={[
@@ -278,7 +286,7 @@ export default function AssistantDashboardScreen() {
                           setDraft({ ...draft, assignee: student.email });
                           setShowAssigneePicker(false);
                         }}>
-                        <User size={16} color={draft.assignee === student.email ? '#3b82f6' : '#64748b'} />
+                        <UserIcon size={16} color={draft.assignee === student.email ? '#3b82f6' : '#64748b'} />
                         <Text
                           style={[
                             styles.pickerItemText,

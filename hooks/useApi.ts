@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createAuthenticatedApi, publicApi } from '@/lib/api';
 import { useApiAuth } from './useApiAuth';
 import { useToast } from './use-toast';
-import type { Event, Task, User } from '@/types/api';
+import type { Event, Task, User, CreateTaskRequest, CreateEventRequest } from '@/types/api';
 
 // Events
 export const useEvents = (course?: string) =>
@@ -18,7 +18,7 @@ export const useCreateEvent = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (event: Omit<Event, '_id' | 'createdAt' | 'updatedAt'>) => api.createEvent(event),
+    mutationFn: (event: CreateEventRequest) => api.createEvent(event),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
       toast({ title: 'Success', description: 'Event created successfully' });
@@ -84,7 +84,7 @@ export const useCreateTask = () => {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (task: Omit<Task, '_id' | 'createdAt' | 'updatedAt'>) => api.createTask(task),
+    mutationFn: (task: CreateTaskRequest) => api.createTask(task),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       toast({ title: 'Success', description: 'Task created successfully' });
