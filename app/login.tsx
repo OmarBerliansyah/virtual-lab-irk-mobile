@@ -1,10 +1,12 @@
-import { mockUsers, useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
+import { useSignIn, useSignUp } from '@clerk/clerk-expo';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Lock, LogIn, Mail, User } from 'lucide-react-native';
+import { Lock, LogIn, Mail, UserPlus } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,29 +16,102 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export default function LoginScreen() {
-  const { login, isLoading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { isAuthenticated } = useAuth();
+  const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
+  const { signUp, isLoaded: signUpLoaded } = useSignUp();
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      return;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSignUpMode, setIsSignUpMode] = useState(false);
+
+  // Redirect if already authenticated
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)');
     }
+  }, [isAuthenticated]);
+
+  const handleSignIn = async () => {
+    if (!signInLoaded || !email.trim() || !password.trim()) return;
+
+    setIsLoading(true);
     try {
-      await login(email.trim(), password);
-    } catch (error) {
-      // Error is handled by Toast in AuthContext
+      const result = await signIn.create({
+        identifier: email.trim(),
+        password: password,
+      });
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        Toast.show({
+          type: 'success',
+          text1: 'Welcome back!',
+          text2: 'Successfully signed in',
+        });
+        router.replace('/(tabs)');
+      } else {
+        console.log('Sign in incomplete:', result);
+        Toast.show({
+          type: 'info',
+          text1: 'Additional verification needed',
+          text2: 'Please complete the sign-in process',
+        });
+      }
+    } catch (err: any) {
+      console.error('Sign in error:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Sign In Failed',
+        text2: err.errors?.[0]?.message || 'Invalid email or password',
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const quickLogin = (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword('password123'); // Mock password
-    login(userEmail, 'password123');
+  const handleSignUp = async () => {
+    if (!signUpLoaded || !email.trim() || !password.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const result = await signUp.create({
+        emailAddress: email.trim(),
+        password: password,
+      });
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        Toast.show({
+          type: 'success',
+          text1: 'Account created!',
+          text2: 'Welcome to Virtual Lab IRK',
+        });
+        router.replace('/(tabs)');
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Verify your email',
+          text2: 'Please check your inbox',
+        });
+      }
+    } catch (err: any) {
+      console.error('Sign up error:', err);
+      Toast.show({
+        type: 'error',
+        text1: 'Sign Up Failed',
+        text2: err.errors?.[0]?.message || 'Could not create account',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const isFormValid = email.trim().length > 0 && password.trim().length >= 8;
 
   return (
     <KeyboardAvoidingView
@@ -59,9 +134,17 @@ export default function LoginScreen() {
             style={styles.heroOverlay}
           />
           <View style={styles.heroContent}>
-            <LogIn size={48} color="#ffffff" />
-            <Text style={styles.heroTitle}>Welcome Back</Text>
-            <Text style={styles.heroSubtitle}>Sign in to continue</Text>
+            {isSignUpMode ? (
+              <UserPlus size={48} color="#ffffff" />
+            ) : (
+              <LogIn size={48} color="#ffffff" />
+            )}
+            <Text style={styles.heroTitle}>
+              {isSignUpMode ? 'Create Account' : 'Welcome Back'}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              {isSignUpMode ? 'Join Virtual Lab IRK' : 'Sign in to continue'}
+            </Text>
           </View>
         </View>
 
@@ -80,6 +163,7 @@ export default function LoginScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  editable={!isLoading}
                 />
               </View>
             </View>
@@ -89,68 +173,50 @@ export default function LoginScreen() {
                 <Lock size={20} color="#64748b" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Password"
+                  placeholder="Password (min 8 characters)"
                   placeholderTextColor="#94a3b8"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                   autoCapitalize="none"
+                  editable={!isLoading}
                 />
               </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading || !email.trim() || !password.trim()}>
-              <Text style={styles.loginButtonText}>
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </Text>
+              style={[styles.loginButton, (!isFormValid || isLoading) && styles.loginButtonDisabled]}
+              onPress={isSignUpMode ? handleSignUp : handleSignIn}
+              disabled={!isFormValid || isLoading}>
+              {isLoading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.loginButtonText}>
+                  {isSignUpMode ? 'Create Account' : 'Sign In'}
+                </Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Or login with test accounts</Text>
+              <Text style={styles.dividerText}>or</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Quick Login Buttons */}
-            <View style={styles.quickLoginContainer}>
-              {mockUsers.map((user) => (
-                <TouchableOpacity
-                  key={user._id}
-                  style={[
-                    styles.quickLoginButton,
-                    user.role === 'admin' && styles.quickLoginButtonAdmin,
-                    user.role === 'assistant' && styles.quickLoginButtonAssistant,
-                  ]}
-                  onPress={() => quickLogin(user.email)}
-                  disabled={isLoading}>
-                  <User size={20} color={user.role === 'admin' ? '#ffffff' : user.role === 'assistant' ? '#ffffff' : '#3b82f6'} />
-                  <View style={styles.quickLoginInfo}>
-                    <Text
-                      style={[
-                        styles.quickLoginEmail,
-                        (user.role === 'admin' || user.role === 'assistant') && styles.quickLoginEmailWhite,
-                      ]}>
-                      {user.email}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.quickLoginRole,
-                        (user.role === 'admin' || user.role === 'assistant') && styles.quickLoginRoleWhite,
-                      ]}>
-                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity
+              style={styles.switchButton}
+              onPress={() => setIsSignUpMode(!isSignUpMode)}
+              disabled={isLoading}>
+              <Text style={styles.switchButtonText}>
+                {isSignUpMode
+                  ? 'Already have an account? Sign In'
+                  : "Don't have an account? Sign Up"}
+              </Text>
+            </TouchableOpacity>
 
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
-                <Text style={styles.infoBold}>Note:</Text> All test accounts use password:{' '}
-                <Text style={styles.infoPassword}>password123</Text>
+                Virtual Lab IRK - Platform pembelajaran interaktif untuk mahasiswa informatika
               </Text>
             </View>
           </View>
@@ -250,7 +316,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   loginButtonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#94a3b8',
   },
   loginButtonText: {
     color: '#ffffff',
@@ -273,66 +339,25 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '500',
   },
-  quickLoginContainer: {
-    gap: 12,
-  },
-  quickLoginButton: {
-    flexDirection: 'row',
+  switchButton: {
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    gap: 12,
+    paddingVertical: 12,
   },
-  quickLoginButtonAssistant: {
-    borderColor: '#3b82f6',
-    backgroundColor: '#3b82f6',
-  },
-  quickLoginButtonAdmin: {
-    borderColor: '#ef4444',
-    backgroundColor: '#ef4444',
-  },
-  quickLoginInfo: {
-    flex: 1,
-  },
-  quickLoginEmail: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 2,
-  },
-  quickLoginEmailWhite: {
-    color: '#ffffff',
-  },
-  quickLoginRole: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  quickLoginRoleWhite: {
-    color: '#ffffff',
-    opacity: 0.9,
+  switchButtonText: {
+    color: '#3b82f6',
+    fontSize: 16,
+    fontWeight: '500',
   },
   infoBox: {
     marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
     backgroundColor: '#f0f9ff',
-    borderWidth: 1,
-    borderColor: '#bae6fd',
   },
   infoText: {
-    fontSize: 12,
-    color: '#0f172a',
+    fontSize: 14,
+    color: '#0369a1',
     textAlign: 'center',
-  },
-  infoBold: {
-    fontWeight: '700',
-  },
-  infoPassword: {
-    fontFamily: 'monospace',
-    fontWeight: '600',
-    color: '#3b82f6',
+    lineHeight: 20,
   },
 });

@@ -21,6 +21,8 @@ export default function ProfileScreen() {
   const { logout } = useAuth();
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
+  const isAdmin = user?.role === 'admin';
+  const isAssistant = user?.role === 'assistant';
 
   const handleUpdate = async () => {
     if (!email.trim()) {
@@ -133,6 +135,29 @@ export default function ProfileScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {(isAdmin || isAssistant) && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Dashboard Access</Text>
+              <Text style={styles.helperText}>
+                Buka dashboard sesuai peranmu untuk mengelola data dan tugas.
+              </Text>
+              {isAdmin && (
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => router.push('/admin-dashboard')}>
+                  <Text style={styles.secondaryButtonText}>Buka Admin Dashboard</Text>
+                </TouchableOpacity>
+              )}
+              {isAssistant && (
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => router.push('/assistant-dashboard')}>
+                  <Text style={styles.secondaryButtonText}>Buka Assistant Dashboard</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           <View style={styles.card}>
             <TouchableOpacity
@@ -266,6 +291,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  secondaryButton: {
+    backgroundColor: '#0f172a',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#475569',
+    lineHeight: 18,
   },
   logoutButton: {
     flexDirection: 'row',

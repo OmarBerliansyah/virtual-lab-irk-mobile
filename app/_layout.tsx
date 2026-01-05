@@ -1,22 +1,27 @@
 import CustomSplashScreen from '@/components/SplashScreen';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext.clerk';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { tokenCache } from '@/utils/clerkTokenCache';
+import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
 import '../global.css';
 
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+if (!clerkPublishableKey) {
+  throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
+}
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,28 +71,34 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        <Stack.Screen name="assistant-dashboard" options={{ title: 'Assistant Dashboard' }} />
-        <Stack.Screen name="admin-dashboard" options={{ title: 'Admin Dashboard' }} />
-        <Stack.Screen name="task-detail/[id]" options={{ title: 'Task Details', presentation: 'card' }} />
-        <Stack.Screen name="task-management-detail/[id]" options={{ title: 'Task Management', presentation: 'card' }} />
-        <Stack.Screen name="highlight-detail/[id]" options={{ title: 'Highlight Details', presentation: 'card' }} />
-      </Stack>
-      <StatusBar style="auto" />
+      <View style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          <Stack.Screen name="assistant-dashboard" options={{ title: 'Assistant Dashboard' }} />
+          <Stack.Screen name="admin-dashboard" options={{ title: 'Admin Dashboard' }} />
+          <Stack.Screen name="task-detail/[id]" options={{ title: 'Task Details', presentation: 'card' }} />
+          <Stack.Screen name="task-management-detail/[id]" options={{ title: 'Task Management', presentation: 'card' }} />
+          <Stack.Screen name="highlight-detail/[id]" options={{ title: 'Highlight Details', presentation: 'card' }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </View>
     </ThemeProvider>
   );
 }
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <RootLayoutNav />
-        <Toast />
-      </QueryClientProvider>
-    </AuthProvider>
+    <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <RootLayoutNav />
+            <Toast />
+          </QueryClientProvider>
+        </AuthProvider>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }
