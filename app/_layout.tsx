@@ -9,19 +9,20 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
 import '../global.css';
 
 const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-if (!clerkPublishableKey) {
+if (!clerkPublishableKey && Platform.OS !== 'web') {
   throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
 }
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync();
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,33 +40,34 @@ const queryClient = new QueryClient({
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [isSplashReady, setSplashReady] = useState(false);
+  const isWeb = Platform.OS === 'web';
+  const authContext = isWeb ? { isAuthenticated: false, isLoading: false } : useAuth();
+  const { isAuthenticated, isLoading } = authContext;
 
   useEffect(() => {
-    if (isSplashReady && !isLoading) {
-      // Hide the splash screen once authentication state is loaded and splash animation is done
+    if (isSplashReady && !isLoading && !isWeb) {
       SplashScreen.hideAsync();
     }
-  }, [isSplashReady, isLoading]);
+  }, [isSplashReady, isLoading, isWeb]);
 
   useEffect(() => {
     if (isLoading) return;
-
     const inAuthGroup = segments[0] === '(tabs)';
-
-    if (!isAuthenticated && inAuthGroup) {
-      // Redirect to login if not authenticated
+    if (!isAuthenticated && inAuthGroup && !isWeb) {
       router.replace('/login');
-    } else if (isAuthenticated && segments[0] === 'login') {
-      // Redirect to tabs if authenticated and on login screen
+    } else if (isAuthenticated && segments[0] === 'login' && !isWeb) {
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, segments, router, isWeb]);
 
   if (!isSplashReady || isLoading) {
+    if (isWeb) {
+      if (!isSplashReady) setSplashReady(true);
+      if (isLoading) return null;
+    }
     return <CustomSplashScreen onFinish={() => setSplashReady(true)} />;
   }
 
@@ -89,8 +91,16 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  if (Platform.OS === 'web') {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <RootLayoutNav />
+        <Toast />
+      </QueryClientProvider>
+    );
+  }
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+    <ClerkProvider publishableKey={clerkPublishableKey!} tokenCache={tokenCache}>
       <ClerkLoaded>
         <AuthProvider>
           <QueryClientProvider client={queryClient}>

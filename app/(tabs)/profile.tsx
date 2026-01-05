@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
 import { useUserProfile } from '@/hooks/useApi';
 import { useRouter } from 'expo-router';
 import { LogOut, User } from 'lucide-react-native';

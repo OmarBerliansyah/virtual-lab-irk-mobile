@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
 import { useCreateTask, useDeleteTask, useGetUsers, useTasks, useUpdateTask } from '@/hooks/useApi';
 import type { Task, User as UserType } from '@/types/api';
 import { Stack, useRouter } from 'expo-router';
