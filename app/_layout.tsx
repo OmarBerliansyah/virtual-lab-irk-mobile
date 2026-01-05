@@ -20,6 +20,7 @@ LogBox.ignoreLogs([
   '"shadow*" style props are deprecated. Use "boxShadow".',
   'Animated: `useNativeDriver` is not supported because the native animated module is missing',
   'Supabase environment variables not set',
+  'Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.',
 ]);
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

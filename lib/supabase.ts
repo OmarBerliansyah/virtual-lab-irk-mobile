@@ -24,20 +24,36 @@ const supabaseAnonKey =
   Constants.expoConfig?.extra?.supabaseAnonKey || 
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = (supabaseUrl && supabaseAnonKey)
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+// Validate URL format before creating client
+const isValidUrl = (url: string | undefined): boolean => {
+  if (!url) return false;
+  return /^(http|https):\/\/[^ "]+$/.test(url);
+};
+
+let supabase = null;
+
+// Only create Supabase client if BOTH credentials are valid
+if (supabaseUrl && supabaseAnonKey && isValidUrl(supabaseUrl)) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         storage: ExpoSecureStoreAdapter,
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
       },
-    })
-  : null;
+    });
+  } catch (error) {
+    console.warn('⚠️ Supabase initialization failed (optional):', error);
+    supabase = null;
+  }
+}
 
 // Supabase is optional - app works with Clerk only
 if (!supabase) {
   // Silent - Supabase not needed for basic functionality
 }
+
+export { supabase };
 
   
