@@ -3,6 +3,7 @@ export interface User {
   clerkId: string;
   email: string;
   role: 'USER' | 'ASSISTANT' | 'ADMIN';
+  version: number; // Required for Optimistic Concurrency Control
   createdAt: string;
   updatedAt: string;
 }
@@ -13,6 +14,7 @@ export interface ProfileUser {
   clerkId: string;
   email: string;
   role: 'USER' | 'ASSISTANT' | 'ADMIN';
+  version: number; // Required for Optimistic Concurrency Control
   createdAt: string;
   updatedAt: string;
 }
@@ -39,7 +41,8 @@ export interface Task {
   priority: 'low' | 'medium' | 'high';
   status: 'To Do' | 'In Progress' | 'Done';
   dueDate?: string;
-  assignee?: string; // For student tasks, this is the student email. For assistant tasks, this is null/empty
+  assignee?: string; // Assistant name (from backend)
+  assistantId?: string; // Required by backend - Assistant UUID
   tags: string[];
   version: number; // Required for OCC
   createdAt: string;
@@ -57,10 +60,11 @@ export interface CreateTaskRequest {
   status?: 'To Do' | 'In Progress' | 'Done';
   dueDate?: string;
   assignee?: string;
+  assistantId: string; // Required by backend - must be valid Assistant UUID
   tags?: string[];
 }
 
-export type UpdateTaskRequest = Partial<CreateTaskRequest> & { version?: number };
+export type UpdateTaskRequest = Partial<CreateTaskRequest> & { version: number }; // version is REQUIRED for OCC
 
 export interface CreateEventRequest {
   title: string;
@@ -73,10 +77,12 @@ export interface CreateEventRequest {
   linkAttachments?: { title: string; url: string }[];
 }
 
-export type UpdateEventRequest = Partial<CreateEventRequest> & { version?: number };
+export type UpdateEventRequest = Partial<CreateEventRequest> & { version: number }; // version is REQUIRED for OCC
 
 export interface UpdateUserRequest {
   email?: string;
+  role?: 'USER' | 'ASSISTANT' | 'ADMIN'; // Backend expects UPPERCASE
+  version: number; // Required for Optimistic Concurrency Control
 }
 
 export interface UserProfileResponse {

@@ -1,10 +1,8 @@
 import { useClerk } from '@clerk/clerk-expo';
-import * as Linking from 'expo-linking';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export const SignOutButton = () => {
-  // Use `useClerk()` to access the `signOut()` function
   const { signOut } = useClerk();
   const router = useRouter();
 
@@ -14,9 +12,7 @@ export const SignOutButton = () => {
       // Redirect to login page
       router.replace('/login');
     } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error('Sign out error:', JSON.stringify(err, null, 2));
+      console.error('Sign out error:', err);
     }
   };
 

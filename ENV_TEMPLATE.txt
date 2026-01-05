@@ -1,0 +1,58 @@
+# =====================================================
+# TEMPLATE FILE .env UNTUK MOBILE APP
+# =====================================================
+# 
+# INSTRUKSI:
+# 1. Copy file ini dan rename menjadi .env
+# 2. Isi semua value yang diperlukan
+# 3. JANGAN commit file .env ke git!
+#
+# =====================================================
+
+# -------------------------------------------------
+# CLERK AUTHENTICATION
+# -------------------------------------------------
+# Dapatkan dari: https://dashboard.clerk.com
+# Pilih aplikasi yang SAMA dengan web app Anda
+# API Keys > Publishable Key
+#
+# Format: pk_test_xxxxxxxxxxxxxxxxxxxxxx (untuk testing)
+#         pk_live_xxxxxxxxxxxxxxxxxxxxxx (untuk production)
+#
+
+# -------------------------------------------------
+# BACKEND API URL
+# -------------------------------------------------
+# URL backend yang sudah di-deploy
+# Production: https://virtual-lab-irk-be.vercel.app
+# Local Dev: http://localhost:3000
+#
+
+# -------------------------------------------------
+# SUPABASE (OPTIONAL)
+# -------------------------------------------------
+# Dapatkan dari: https://supabase.com/dashboard
+# Project Settings > API
+#
+# EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxxxxx.supabase.co
+# EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxxxxx
+
+# -------------------------------------------------
+# CARA MENDAPATKAN CLERK KEY
+# -------------------------------------------------
+# 1. Buka https://dashboard.clerk.com
+# 2. Login dengan akun yang sama untuk web app
+# 3. Pilih aplikasi Virtual Lab IRK (sama dengan web)
+# 4. Sidebar kiri > API Keys
+# 5. Copy "Publishable Key" di bagian "Frontend API"
+# 6. Paste ke EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY di atas
+#
+# NOTE: Gunakan KEY yang SAMA dengan web app agar
+#       user bisa login dengan akun yang sama!
+#
+# -------------------------------------------------
+
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_bWVldC1mbHktOTkuY2xlcmsuYWNjb3VudHMuZGV2JA
+EXPO_PUBLIC_API_BASE_URL=https://virtual-lab-irk-api-iead3.ondigitalocean.app
+EXPO_PUBLIC_SUPABASE_URL=https://nwfadtoamyxnthdiiups.supabase.co
+EXPO_PUBLIC_SUPABASE_KEY=sb_publishable_XfNcWYhJzVDlxrs5MKJngg_BKaJLrxF

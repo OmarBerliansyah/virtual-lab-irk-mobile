@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
 import { api } from '@/lib/api';
 import type { CreateEventRequest, CreateTaskRequest, UpdateEventRequest, UpdateTaskRequest, User } from '@/types/api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

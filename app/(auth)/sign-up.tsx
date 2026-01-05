@@ -1,4 +1,6 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
+import { useSignUp } from '@clerk/clerk-expo';
+import Toast from 'react-native-toast-message';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
@@ -17,7 +19,8 @@ import {
 } from 'react-native';
 
 export default function SignUpScreen() {
-  const { signUp, isLoading: authIsLoading } = useAuth();
+  const { isLoading: authIsLoading } = useAuth();
+  const { signUp, setActive } = useSignUp();
   const router = useRouter();
 
   const [emailAddress, setEmailAddress] = useState('');
@@ -25,14 +28,96 @@ export default function SignUpScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onSignUpPress = async () => {
-    if (!emailAddress.trim() || !password.trim()) return;
+    if (!emailAddress.trim() || !password.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter both email and password',
+      });
+      return;
+    }
 
+    if (password.length < 8) {
+      Toast.show({
+        type: 'error',
+        text1: 'Weak Password',
+        text2: 'Password must be at least 8 characters long',
+      });
+      return;
+    }
+
+    console.log('📝 Attempting sign up for:', emailAddress.trim());
     setIsSubmitting(true);
+    
     try {
-      await signUp(emailAddress.trim(), password.trim());
-      // Navigation will happen automatically via AuthContext
-    } catch (error) {
-      // Error is handled by Toast in AuthContext
+      if (!signUp) {
+        throw new Error('Clerk signUp not initialized');
+      }
+
+      // Create sign up with Clerk
+      const result = await signUp.create({
+        emailAddress: emailAddress.trim(),
+        password: password.trim(),
+      });
+
+      console.log('✅ Clerk sign-up result:', result.status);
+
+      // If email verification is required
+      if (result.status === 'missing_requirements') {
+        Toast.show({
+          type: 'info',
+          text1: 'Email Verification Required',
+          text2: 'Please check your email to verify your account',
+          visibilityTime: 5000,
+        });
+        // You might want to navigate to a verification screen
+        return;
+      }
+
+      // Set the active session if sign up is complete
+      if (result.status === 'complete') {
+        await setActive?.({ session: result.createdSessionId });
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Account Created! 🎉',
+          text2: `Welcome aboard, ${emailAddress}!`,
+        });
+
+        console.log('🚀 Redirecting to dashboard...');
+        
+        // Small delay to ensure AuthContext updates
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 100);
+      } else {
+        throw new Error(`Unexpected sign-up status: ${result.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Sign up error:', error);
+      
+      // Handle specific error codes
+      const errorCode = error?.errors?.[0]?.code;
+      const errorMessage = error?.errors?.[0]?.longMessage || error?.errors?.[0]?.message;
+      
+      let displayMessage = 'Failed to create account';
+      
+      if (errorCode === 'form_identifier_exists') {
+        displayMessage = 'An account with this email already exists. Please sign in instead.';
+      } else if (errorCode === 'form_password_pwned') {
+        displayMessage = 'This password has been compromised in a data breach. Please use a different password.';
+      } else if (errorCode === 'form_password_length_too_short') {
+        displayMessage = 'Password is too short. Please use at least 8 characters.';
+      } else if (errorMessage) {
+        displayMessage = errorMessage;
+      }
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Sign Up Failed',
+        text2: displayMessage,
+        visibilityTime: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }

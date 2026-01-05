@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
 import {
   useCreateEvent,
   useCreateTask,
@@ -13,6 +13,7 @@ import {
   useUpdateUser,
   useUserProfile,
 } from '@/hooks/useApi';
+import { useAssistantId } from '@/hooks/useAssistantId'; // ✅ ADD: For assistantId requirement
 import type { Event, Task, User } from '@/types/api';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,10 +55,19 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { user: authUser } = useAuth();
   const { data: events, isLoading, refetch: refetchEvents } = useEvents();
-  const { data: user } = useUserProfile();
-  const { data: tasks, isLoading: tasksLoading, refetch: refetchTasks } = useTasks(user?.email);
+  const { data: profileData } = useUserProfile();
+  const { data: tasks, isLoading: tasksLoading, refetch: refetchTasks } = useTasks(profileData?.email);
   const { data: allTasks } = useTasks(); // For assistants/admins - all tasks
   const { data: users } = useGetUsers();
+  
+  // ✅ GET ASSISTANT ID (Required by backend for task creation)
+  const { assistantId, hasAssistantProfile, isLoading: loadingAssistant } = useAssistantId();
+  
+  // Use authUser from context for role checks (more reliable than async API fetch)
+  const user = authUser || profileData;
+  
+  console.log('🎯 Dashboard render - user role:', user?.role);
+  console.log('🔑 Assistant ID:', assistantId, 'Has Profile:', hasAssistantProfile);
   
   // Assistant/Admin hooks
   const createTask = useCreateTask();
@@ -138,17 +148,61 @@ export default function DashboardScreen() {
       return;
     }
     if (editingTaskId) {
+      // ✅ Validate version is present
+      if (!taskDraft.version) {
+        Toast.show({
+          type: 'error',
+          text1: 'Update Failed',
+          text2: 'Task version missing. Please refresh and try again.',
+        });
+        return;
+      }
+
       updateTask.mutate(
-        { id: editingTaskId, task: { ...taskDraft } },
+        { 
+          id: editingTaskId, 
+          task: { 
+            ...taskDraft,
+            version: taskDraft.version, // ✅ REQUIRED by backend for OCC!
+          } 
+        },
         {
           onSuccess: () => {
             Toast.show({ type: 'success', text1: 'Task Updated', text2: 'Task has been updated' });
             resetTaskForm();
             refetchTasks();
           },
+          onError: (error: any) => {
+            console.error('Update task error:', error);
+            const status = error?.response?.status;
+            if (status === 409) {
+              Toast.show({
+                type: 'info', // ✅ Changed from 'warning' to 'info'
+                text1: 'Conflict Detected',
+                text2: 'Task was modified by someone else. Refreshing...',
+              });
+              refetchTasks();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Update Failed',
+                text2: error?.response?.data?.error || error.message || 'Failed to update task',
+              });
+            }
+          },
         },
       );
     } else {
+      // ✅ Validate assistantId before creating task
+      if (!assistantId || !hasAssistantProfile) {
+        Toast.show({
+          type: 'error',
+          text1: 'Cannot Create Task',
+          text2: 'Assistant profile required. Please contact admin.',
+        });
+        return;
+      }
+
       createTask.mutate(
         {
           title: taskDraft.title || '',
@@ -156,6 +210,7 @@ export default function DashboardScreen() {
           priority: (taskDraft.priority as Task['priority']) || 'medium',
           status: (taskDraft.status as Task['status']) || 'To Do',
           dueDate: taskDraft.dueDate,
+          assistantId: assistantId, // ✅ REQUIRED by backend!
           tags: [],
           isAssistantTask: false,
         } as any,
@@ -164,6 +219,14 @@ export default function DashboardScreen() {
             Toast.show({ type: 'success', text1: 'Task Created', text2: 'Task assigned to all students' });
             resetTaskForm();
             refetchTasks();
+          },
+          onError: (error: any) => {
+            console.error('Create task error:', error);
+            Toast.show({
+              type: 'error',
+              text1: 'Create Failed',
+              text2: error?.response?.data?.error || error.message || 'Failed to create task',
+            });
           },
         },
       );
@@ -182,17 +245,61 @@ export default function DashboardScreen() {
       return;
     }
     if (editingAssistantTaskId) {
+      // ✅ Validate version is present
+      if (!assistantTaskDraft.version) {
+        Toast.show({
+          type: 'error',
+          text1: 'Update Failed',
+          text2: 'Task version missing. Please refresh and try again.',
+        });
+        return;
+      }
+
       updateTask.mutate(
-        { id: editingAssistantTaskId, task: { ...assistantTaskDraft } },
+        { 
+          id: editingAssistantTaskId, 
+          task: { 
+            ...assistantTaskDraft,
+            version: assistantTaskDraft.version, // ✅ REQUIRED by backend for OCC!
+          } 
+        },
         {
           onSuccess: () => {
             Toast.show({ type: 'success', text1: 'Task Updated', text2: 'Task has been updated' });
             resetAssistantTaskForm();
             refetchTasks();
           },
+          onError: (error: any) => {
+            console.error('Update assistant task error:', error);
+            const status = error?.response?.status;
+            if (status === 409) {
+              Toast.show({
+                type: 'info', // ✅ Changed from 'warning' to 'info'
+                text1: 'Conflict Detected',
+                text2: 'Task was modified by someone else. Refreshing...',
+              });
+              refetchTasks();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Update Failed',
+                text2: error?.response?.data?.error || error.message || 'Failed to update task',
+              });
+            }
+          },
         },
       );
     } else {
+      // ✅ Validate assistantId before creating task
+      if (!assistantId || !hasAssistantProfile) {
+        Toast.show({
+          type: 'error',
+          text1: 'Cannot Create Task',
+          text2: 'Assistant profile required. Please contact admin.',
+        });
+        return;
+      }
+
       createTask.mutate(
         {
           title: assistantTaskDraft.title || '',
@@ -200,6 +307,7 @@ export default function DashboardScreen() {
           priority: (assistantTaskDraft.priority as Task['priority']) || 'medium',
           status: (assistantTaskDraft.status as Task['status']) || 'To Do',
           dueDate: assistantTaskDraft.dueDate,
+          assistantId: assistantId, // ✅ REQUIRED by backend!
           tags: [],
           isAssistantTask: true,
         } as any,
@@ -208,6 +316,14 @@ export default function DashboardScreen() {
             Toast.show({ type: 'success', text1: 'Task Created', text2: 'Personal task has been created' });
             resetAssistantTaskForm();
             refetchTasks();
+          },
+          onError: (error: any) => {
+            console.error('Create assistant task error:', error);
+            Toast.show({
+              type: 'error',
+              text1: 'Create Failed',
+              text2: error?.response?.data?.error || error.message || 'Failed to create task',
+            });
           },
         },
       );
@@ -242,13 +358,47 @@ export default function DashboardScreen() {
       return;
     }
     if (editingHighlightId) {
+      // ✅ Validate version is present
+      if (!highlightDraft.version) {
+        Toast.show({
+          type: 'error',
+          text1: 'Update Failed',
+          text2: 'Highlight version missing. Please refresh and try again.',
+        });
+        return;
+      }
+
       updateEvent.mutate(
-        { id: editingHighlightId, event: { ...highlightDraft } },
+        { 
+          id: editingHighlightId, 
+          event: { 
+            ...highlightDraft,
+            version: highlightDraft.version, // ✅ REQUIRED by backend for OCC!
+          } 
+        },
         {
           onSuccess: () => {
             Toast.show({ type: 'success', text1: 'Highlight Updated', text2: 'Highlight has been updated' });
             resetHighlightForm();
             refetchEvents();
+          },
+          onError: (error: any) => {
+            console.error('Update highlight error:', error);
+            const status = error?.response?.status;
+            if (status === 409) {
+              Toast.show({
+                type: 'info', // ✅ Changed from 'warning' to 'info'
+                text1: 'Conflict Detected',
+                text2: 'Highlight was modified by someone else. Refreshing...',
+              });
+              refetchEvents();
+            } else {
+              Toast.show({
+                type: 'error',
+                text1: 'Update Failed',
+                text2: error?.response?.data?.error || error.message || 'Failed to update highlight',
+              });
+            }
           },
         },
       );
@@ -267,6 +417,14 @@ export default function DashboardScreen() {
             Toast.show({ type: 'success', text1: 'Highlight Created', text2: 'New highlight has been added' });
             resetHighlightForm();
             refetchEvents();
+          },
+          onError: (error: any) => {
+            console.error('Create highlight error:', error);
+            Toast.show({
+              type: 'error',
+              text1: 'Create Failed',
+              text2: error?.response?.data?.error || error.message || 'Failed to create highlight',
+            });
           },
         },
       );
@@ -297,8 +455,26 @@ export default function DashboardScreen() {
   // User management handlers (Admin)
   const handleSaveUser = (targetUser: User) => {
     const pending = editingUser[targetUser._id] || { email: targetUser.email, role: targetUser.role };
+    
+    // ✅ Validate version is present
+    if (!targetUser.version) {
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: 'User version missing. Please refresh and try again.',
+      });
+      return;
+    }
+
     updateUser.mutate(
-      { id: targetUser._id, data: { email: pending.email, role: pending.role } },
+      { 
+        id: targetUser._id, 
+        data: { 
+          email: pending.email, 
+          role: pending.role,
+          version: targetUser.version, // ✅ REQUIRED by backend for OCC!
+        } 
+      },
       {
         onSuccess: () => {
           Toast.show({ type: 'success', text1: 'User Updated', text2: 'User information has been updated' });
@@ -307,6 +483,24 @@ export default function DashboardScreen() {
             delete newState[targetUser._id];
             return newState;
           });
+        },
+        onError: (error: any) => {
+          console.error('Update user error:', error);
+          const status = error?.response?.status;
+          if (status === 409) {
+            Toast.show({
+              type: 'info', // ✅ Changed from 'warning' to 'info'
+              text1: 'Conflict Detected',
+              text2: 'User was modified by someone else. Refreshing...',
+            });
+            // Refetch users list
+          } else {
+            Toast.show({
+              type: 'error',
+              text1: 'Update Failed',
+              text2: error?.response?.data?.error || error.message || 'Failed to update user',
+            });
+          }
         },
       },
     );

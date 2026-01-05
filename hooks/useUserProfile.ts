@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import { createAuthenticatedApi } from '@/lib/api';
 import { useApiAuth } from './useApiAuth';
 import type { ProfileUser } from '@/types/api';
 
 export function useUserProfile() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn } = useClerkAuth();
   const { getAuthHeaders } = useApiAuth();
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [loading, setLoading] = useState(false);

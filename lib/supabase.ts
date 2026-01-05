@@ -35,8 +35,9 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
     })
   : null;
 
+// Supabase is optional - app works with Clerk only
 if (!supabase) {
-  console.warn('Supabase environment variables not set. Supabase client is not initialized.');
+  // Silent - Supabase not needed for basic functionality
 }
 
   

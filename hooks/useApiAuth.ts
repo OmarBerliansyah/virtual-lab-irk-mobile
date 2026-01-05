@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import { useCallback } from 'react';
 
 // Tracks pending GET requests to avoid duplicate network calls
@@ -15,15 +15,25 @@ const withTimeout = async (promise: Promise<Response>, timeoutMs = 30000) => {
 };
 
 export function useApiAuth() {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useClerkAuth();
 
   const getAuthHeaders = useCallback(async () => {
+    if (!isSignedIn) {
+      throw new Error('Not authenticated');
+    }
+    
+    // Get the actual JWT token from Clerk
     const token = await getToken();
+    
+    if (!token) {
+      throw new Error('Failed to get authentication token');
+    }
+    
     return {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
-  }, [getToken]);
+  }, [getToken, isSignedIn]);
 
   const apiCall = useCallback(
     async (endpoint: string, options: RequestInit = {}) => {

@@ -1,4 +1,5 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext.clerk';
+import { useClerk } from '@clerk/clerk-expo';
 import { useUserProfile } from '@/hooks/useApi';
 import { useRouter } from 'expo-router';
 import { LogOut, User } from 'lucide-react-native';
@@ -19,6 +20,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { data: user, isLoading, refetch } = useUserProfile();
   const { logout } = useAuth();
+  const { signOut } = useClerk();
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -138,8 +140,19 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.logoutButton}
               onPress={async () => {
-                await logout();
-                router.replace('/login');
+                console.log('🚪 Logging out...');
+                try {
+                  await signOut();
+                  console.log('✅ Logout successful');
+                  router.replace('/login');
+                } catch (error) {
+                  console.error('❌ Logout error:', error);
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Logout Failed',
+                    text2: 'Please try again',
+                  });
+                }
               }}>
               <LogOut size={20} color="#ef4444" />
               <Text style={styles.logoutButtonText}>Log Out</Text>
